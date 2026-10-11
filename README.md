@@ -18,9 +18,9 @@
 
 - Krea 2 Turbo FP8, Qwen3VL FP8 and BF16, Qwen Image VAE and WAN 2.1 VAE
 - CRT-Nodes, rgthree-comfy
-- **No LoRA**, no Aiorbust
+- LoRAs from the configured Google Drive folder; no Aiorbust
 
-Place your own LoRA files in `/workspace/runpod-slim/ComfyUI/models/loras/`.
+Additional LoRA files can be placed in `/workspace/runpod-slim/ComfyUI/models/loras/`.
 
 ## Notes
 
@@ -29,3 +29,19 @@ Place your own LoRA files in `/workspace/runpod-slim/ComfyUI/models/loras/`.
 - If the custom nodes are still not recognized, inspect `/start.sh` logs for `IMPORT FAILED` and verify compatibility with the current ComfyUI. The latest CRT-Nodes version may not have the exact `CRT Post-Process Suite` node used by the original workflow.
 - Krea 2's official workflow specifies `qwen_image_vae.safetensors`. Your supplied custom workflow specified `wan_2.1_vae.safetensors`; both files are included, but the original selection may not produce correct results, so test Qwen Image VAE if decoding fails.
 - Krea 2 model weights are provided under the Krea 2 community license, separately from this installer.
+
+## Additional automation: beta57 and Google Drive LoRAs
+
+- The image installs `comfyui-obvpm` and patches the matching ComfyUI version's
+  `comfy/samplers.py` before startup to register the `beta57` scheduler early.
+  This registration is idempotent across persistent-volume restarts.
+- The image installs `gdown` into ComfyUI's own Python virtual environment and
+  downloads LoRA files from Google Drive folder
+  `1UUGtOwtoq9L4-cijHrR974NfymK-74qk` into
+  `/workspace/runpod-slim/ComfyUI/models/loras/`.
+- On Google Drive quota or permission errors, it retries three times and then
+  starts ComfyUI with whatever has downloaded; check startup logs.
+- After startup, check real API support for `beta57` with:
+  `curl -s http://127.0.0.1:8188/object_info/KSampler | python3 -c 'import json,sys; print("beta57" in json.load(sys.stdin)["KSampler"]["input"]["required"]["scheduler"][0])'`
+- If your persistent `/workspace` already has LoRA files, this downloads into
+  the same directory rather than `/ComfyUI/models/loras`.

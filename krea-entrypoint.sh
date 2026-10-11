@@ -45,6 +45,12 @@ install_node() {
 
 install_node rgthree-comfy https://github.com/rgthree/rgthree-comfy.git
 install_node CRT-Nodes https://github.com/PGCRT/CRT-Nodes.git
+install_node comfyui-obvpm https://github.com/chanon/comfyui-obvpm.git
+
+# Registration in comfy/samplers.py happens before custom nodes are loaded.
+# Keep obvpm installed as well; this is an idempotent compatibility workaround
+# for images where the KSampler API does not reflect custom-node registration.
+"$PY" /usr/local/bin/enable-beta57.py "$C/comfy/samplers.py"
 
 # Verify the downloaded file size exactly where known; download to .part,
 # atomically rename only after completion. curl retries transient failures.
@@ -67,7 +73,7 @@ download_model() {
 }
 
 BASE=https://huggingface.co/Comfy-Org/Krea-2/resolve/main
-# Deliberately omit LoRA: upload your own files to models/loras.
+# LoRA files are downloaded separately from the Google Drive folder below.
 download_model "$BASE/diffusion_models/krea2_turbo_fp8_scaled.safetensors" \
   "$C/models/diffusion_models/krea2_turbo_fp8_scaled.safetensors" 12000000000
 download_model "$BASE/text_encoders/qwen3vl_4b_fp8_scaled.safetensors" \
@@ -82,5 +88,24 @@ download_model 'https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/reso
 # WAN VAE is small enough to verify each boot; catch incorrect partial files.
 echo '2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b  '"$C/models/vae/wan_2.1_vae.safetensors" | sha256sum -c -
 
-echo '[4/4] Starting original RunPod services and ComfyUI'
+echo '[4/4] Downloading LoRA files from Google Drive'
+# Use the exact model directory read by this RunPod ComfyUI image.
+# Downloads are best-effort: a Google Drive quota/access error should not
+# stop ComfyUI from starting; inspect logs if expected LoRAs are absent.
+"$PY" -m pip install -U gdown
+LORA_URL='https://drive.google.com/drive/folders/1UUGtOwtoq9L4-cijHrR974NfymK-74qk?usp=sharing'
+for attempt in 1 2 3; do
+  if "$PY" -m gdown "$LORA_URL" --folder -O "$C/models/loras"; then
+    echo '[LoRA] Google Drive sync completed'
+    break
+  fi
+  echo "[LoRA] Download failed, attempt $attempt/3" >&2
+  if [ "$attempt" -eq 3 ]; then
+    echo '[LoRA] WARNING: Google Drive download incomplete; ComfyUI will still start' >&2
+  else
+    sleep 15
+  fi
+done
+
+echo '[4/4] Starting original RunPod services and ComfyUI' 
 exec /start.sh
