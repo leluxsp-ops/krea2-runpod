@@ -25,6 +25,22 @@ if [ -f /opt/comfyui-runtime-constraints.txt ]; then
   export PIP_CONSTRAINT=/opt/comfyui-runtime-constraints.txt
 fi
 
+# CRT-Nodes currently imports comfy.ldm.minimax.controlnet. The baked
+# ComfyUI v0.30.0 lacks that module; pin core to a compatible stable tag.
+# This runs in the image startup automatically, not in a user's terminal.
+echo '[1/4] Ensuring ComfyUI core v0.35.0 (CRT compatibility)'
+if [ ! -d "$C/.git" ]; then
+  echo "ERROR: No git metadata in $C; cannot safely upgrade core" >&2
+  exit 1
+fi
+if ! "$PY" -c 'import sys;sys.path.insert(0,sys.argv[1]);import comfy.ldm.minimax.controlnet' "$C" 2>/dev/null; then
+  git -C "$C" fetch --depth 1 origin tag v0.35.0
+  git -C "$C" -c advice.detachedHead=false checkout --detach v0.35.0
+  "$PY" -m pip install -r "$C/requirements.txt"
+fi
+# Validate version compatibility before spending bandwidth on large models.
+(cd "$C" && "$PY" -c 'import comfy.ldm.minimax.controlnet; print("[CRT] MiniMax module available")')
+
 mkdir -p "$C/models/diffusion_models" "$C/models/text_encoders" \
          "$C/models/vae" "$C/models/loras" "$C/custom_nodes"
 

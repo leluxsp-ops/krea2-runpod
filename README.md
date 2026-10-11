@@ -45,3 +45,15 @@ Additional LoRA files can be placed in `/workspace/runpod-slim/ComfyUI/models/lo
   `curl -s http://127.0.0.1:8188/object_info/KSampler | python3 -c 'import json,sys; print("beta57" in json.load(sys.stdin)["KSampler"]["input"]["required"]["scheduler"][0])'`
 - If your persistent `/workspace` already has LoRA files, this downloads into
   the same directory rather than `/ComfyUI/models/loras`.
+
+
+## CRT Post-Process Suite fix (automatic)
+At boot, the wrapper checks for `comfy.ldm.minimax.controlnet`. The
+original baked ComfyUI v0.30.0 does not have this module, so the wrapper
+fetches **ComfyUI v0.35.0**, installs its Python requirements in the
+RunPod virtual environment, and verifies that the module imports **before**
+loading `CRT-Nodes`. You do not need to run any terminal commands.
+
+If initialization fails, inspect Pod startup logs. This changes ComfyUI
+core and may affect other custom nodes; it cannot be guaranteed without
+running a Pod. Core and nodes remain on the Pod filesystem.
